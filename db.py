@@ -113,7 +113,7 @@ class Database:
     def list_emails(self) -> list[dict]:
         return list(self.emails.find({}, {"_id": 0, "imap_pass": 0}))
 
-def list_emails_paginated(self, page: int, page_size: int) -> list[dict]:
+    def list_emails_paginated(self, page: int, page_size: int) -> list[dict]:
         return list(
             self.emails.find({}, {"_id": 0, "imap_pass": 0})
             .sort("created_at", -1)
@@ -135,7 +135,7 @@ def list_emails_paginated(self, page: int, page_size: int) -> list[dict]:
     def count_users(self) -> int:
         return self.users.count_documents({})
 
-def count_active_users(self) -> int:
+    def count_active_users(self) -> int:
         from datetime import datetime, timedelta
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         return self.users.count_documents({"last_seen": {"$gte": thirty_days_ago}})
