@@ -98,8 +98,7 @@ async def code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🔍 Buscando el último código para *{target_email}*…", parse_mode="Markdown")
 
     try:
-        creds = db.get_email_credentials(target_email)
-        result = fetch_latest_email_for_address(target_email, creds["imap_user"], creds["imap_pass"])
+        result = fetch_latest_email_for_address(target_email)
         if result is None:
             await update.message.reply_text("⚠️ No se encontró ningún código. Por favor, intenta reenviar el código.", parse_mode="Markdown")
             return
@@ -135,22 +134,19 @@ async def admin_only(update: Update) -> bool:
 async def addmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await admin_only(update):
         return
-    if not context.args or len(context.args) < 3:
+    if not context.args:
         await update.message.reply_text(
-            "Uso: /addmail `<correo>` `<usuario_imap>` `<contraseña_imap>`\n\n"
-            "Ejemplo: `/addmail user@outlook.com user@outlook.com micontraseña`",
+            "Uso: /addmail `<correo>`\n\n"
+            "Ejemplo: `/addmail user@outlook.com`",
             parse_mode="Markdown"
         )
         return
     email_addr = context.args[0].strip().lower()
-    imap_user = context.args[1].strip()
-    imap_pass = context.args[2].strip()
     if db.is_email_registered(email_addr):
         await update.message.reply_text(f"ℹ️ {email_addr} ya está registrado.")
         return
-    db.add_email(email_addr, imap_user=imap_user, imap_pass=imap_pass, added_by=update.effective_user.id)
+    db.add_email(email_addr, added_by=update.effective_user.id)
     await update.message.reply_text(f"✅ *{email_addr}* ha sido registrado.", parse_mode="Markdown")
-
 
 async def removemail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await admin_only(update):
@@ -275,7 +271,7 @@ async def adminhelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     text = (
         "🛠️ *Comandos de Administrador*\n\n"
-        "/addmail `<correo>` `<usuario>` `<contraseña>` — Registrar una nueva dirección de correo\n"
+        "/addmail `<correo>` — Registrar una nueva dirección de correo\n"
         "/removemail `<correo>` — Eliminar un correo registrado\n"
         "/listmails — Ver todos los correos registrados\n"
         "/listusers — Ver todos los usuarios del bot\n"
