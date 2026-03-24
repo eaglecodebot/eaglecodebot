@@ -90,14 +90,12 @@ class Database:
     def is_email_registered(self, email: str) -> bool:
         return self.emails.find_one({"email": email.lower()}) is not None
 
-    def add_email(self, email: str, imap_user: str, imap_pass: str, added_by: int):
+    def add_email(self, email: str, added_by: int):
         from datetime import datetime
         self.emails.update_one(
             {"email": email.lower()},
             {"$setOnInsert": {
                 "email": email.lower(),
-                "imap_user": imap_user,
-                "imap_pass": imap_pass,
                 "added_by": added_by,
                 "created_at": datetime.utcnow()
             }},
