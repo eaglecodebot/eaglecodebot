@@ -57,7 +57,9 @@ def _get_body(msg):
     return ""
 
 
-def fetch_latest_email_for_address(target_email: str, imap_user: str, imap_pass: str):
+def fetch_latest_email_for_address(target_email: str, imap_user: str = None, imap_pass: str = None):
+    imap_user = imap_user or IMAP_USER
+    imap_pass = imap_pass or IMAP_PASS
     """
     Connect to the specific Outlook mailbox using provided credentials
     and return the latest email from ALLOWED_SENDER.
