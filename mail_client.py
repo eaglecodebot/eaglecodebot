@@ -4,10 +4,16 @@ import re
 from email.header import decode_header
 from email.utils import parseaddr
 
-IMAP_HOST = "outlook.office365.com"
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+IMAP_HOST = "imap.gmail.com"
 IMAP_PORT = 993
 IMAP_MAILBOX = "INBOX"
 ALLOWED_SENDER = "info@account.netflix.com"
+IMAP_USER = os.getenv("IMAP_USER")
+IMAP_PASS = os.getenv("IMAP_PASS")
 
 
 def _decode_str(value):
