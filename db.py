@@ -147,17 +147,31 @@ class Database:
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         return self.users.count_documents({"last_seen": {"$gte": thirty_days_ago}})
 
-def get_user_email_requests(self, telegram_id: int) -> list[dict]:
+def get_user_requests(self, telegram_id: int) -> list[dict]:
+        return list(
+            self.db["code_requests"]
+            .find({"telegram_id": telegram_id}, {"_id": 0})
+            .sort("requested_at", -1)
+        )
+
+    def get_requests_paginated(self, page: int, page_size: int) -> list[dict]:
+        return list(
+            self.db["code_requests"]
+            .find({}, {"_id": 0})
+            .sort("requested_at", -1)
+            .skip(page * page_size)
+            .limit(page_size)
+        )
+
+    def count_requests(self) -> int:
+        return self.db["code_requests"].count_documents({})
+
+    def get_user_rankings(self) -> list[dict]:
         pipeline = [
-            {"$match": {"telegram_id": telegram_id}},
             {"$group": {
-                "_id": "$email",
-                "count": {"$sum": 1},
-                "last_requested": {"$max": "$requested_at"}
+                "_id": {"telegram_id": "$telegram_id", "username": "$username"},
+                "total": {"$sum": 1}
             }},
-            {"$sort": {"count": -1}}
+            {"$sort": {"total": -1}}
         ]
         return list(self.db["code_requests"].aggregate(pipeline))
-
-    def count_user_requests(self, telegram_id: int) -> int:
-        return self.db["code_requests"].count_documents({"telegram_id": telegram_id})
