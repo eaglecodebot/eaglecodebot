@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -96,6 +97,8 @@ async def code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(f"🔍 Buscando el último código para *{target_email}*…", parse_mode="Markdown")
+
+    await asyncio.sleep(5)
 
     try:
         result = fetch_latest_email_for_address(target_email)
