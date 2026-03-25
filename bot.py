@@ -1,7 +1,7 @@
 import os
 import re
-import logging
 import asyncio
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -46,7 +46,6 @@ def is_blocked(user_id: int) -> bool:
 
 
 async def guard(update: Update) -> bool:
-    """Return True (and reply) if the user is blocked."""
     uid = update.effective_user.id
     if is_blocked(uid):
         await update.message.reply_text("🚫 Estás bloqueado y no puedes usar este bot.")
@@ -101,6 +100,7 @@ async def code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(5)
 
     try:
+        db.log_code_request(uid, update.effective_user.username or "?", target_email)
         result = fetch_latest_email_for_address(target_email)
         if result is None:
             await update.message.reply_text("⚠️ No se encontró ningún código. Por favor, intenta reenviar el código.", parse_mode="Markdown")
@@ -125,7 +125,6 @@ async def code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─────────────────────────────────────────────
 
 async def admin_only(update: Update) -> bool:
-    """Return True (and reply) if the user is NOT an admin."""
     if await guard(update):
         return True
     if not is_admin(update.effective_user.id):
@@ -150,6 +149,7 @@ async def addmail(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     db.add_email(email_addr, added_by=update.effective_user.id)
     await update.message.reply_text(f"✅ *{email_addr}* ha sido registrado.", parse_mode="Markdown")
+
 
 async def removemail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await admin_only(update):
@@ -269,6 +269,89 @@ async def unblockuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ El usuario `{target_id}` ha sido desbloqueado.", parse_mode="Markdown")
 
 
+async def requestlogs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if await admin_only(update):
+        return
+
+    if not context.args:
+        await update.message.reply_text(
+            "Uso: /requestlogs `<telegram_id>`\n\n"
+            "Ejemplo: `/requestlogs 123456789`",
+            parse_mode="Markdown"
+        )
+        return
+
+    try:
+        target_id = int(context.args[0].strip())
+    except ValueError:
+        await update.message.reply_text("❌ ID de Telegram no válido.")
+        return
+
+    requests = db.get_user_email_requests(target_id)
+    total = db.count_user_requests(target_id)
+
+    if total == 0:
+        await update.message.reply_text(
+            f"📭 El usuario `{target_id}` no ha realizado ninguna solicitud.",
+            parse_mode="Markdown"
+        )
+        return
+
+    lines = []
+    for i, r in enumerate(requests):
+        last = r["last_requested"].strftime("%d/%m/%Y %H:%M")
+        lines.append(
+            f"{i + 1}. `{r['_id']}`\n"
+            f"   🔁 {r['count']} solicitudes — último: {last}"
+        )
+
+    text = (
+        f"📋 *Solicitudes del usuario* `{target_id}`\n"
+        f"📊 Total de solicitudes: *{total}*\n\n"
+        + "\n".join(lines)
+    )
+
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def rankings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if await admin_only(update):
+        return
+
+    data = db.get_user_rankings()
+
+    if not data:
+        await update.message.reply_text("📭 No hay datos de solicitudes todavía.")
+        return
+
+    lines = []
+    for i, entry in enumerate(data):
+        tid = entry["_id"]["telegram_id"]
+        username = entry["_id"].get("username") or "?"
+        total = entry["total"]
+        if i == 0:
+            medal = "🥇"
+        elif i == 1:
+            medal = "🥈"
+        elif i == 2:
+            medal = "🥉"
+        else:
+            medal = f"{i + 1}."
+        lines.append(f"{medal} `{tid}` @{username} — *{total}* solicitudes")
+
+    top = data[0]
+    top_tid = top["_id"]["telegram_id"]
+    top_username = top["_id"].get("username") or "?"
+    top_total = top["total"]
+
+    text = (
+        f"🏆 *Ranking de usuarios*\n\n"
+        f"👑 *Más activo:* `{top_tid}` @{top_username} con *{top_total}* solicitudes\n\n"
+        + "\n".join(lines)
+    )
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+
 async def adminhelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await admin_only(update):
         return
@@ -280,9 +363,16 @@ async def adminhelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/listusers — Ver todos los usuarios del bot\n"
         "/blockuser `<id>` — Bloquear un usuario por su ID de Telegram\n"
         "/unblockuser `<id>` — Desbloquear un usuario\n"
+        "/requestlogs `<id>` — Ver correos solicitados por un usuario\n"
+        "/rankings — Ver ranking de usuarios por solicitudes\n"
         "/adminhelp — Mostrar este mensaje"
     )
     await update.message.reply_text(text, parse_mode="Markdown")
+
+
+# ─────────────────────────────────────────────
+# Pagination callback
+# ─────────────────────────────────────────────
 
 async def pagination_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -382,6 +472,8 @@ def main():
     app.add_handler(CommandHandler("listusers", listusers))
     app.add_handler(CommandHandler("blockuser", blockuser))
     app.add_handler(CommandHandler("unblockuser", unblockuser))
+    app.add_handler(CommandHandler("requestlogs", requestlogs))
+    app.add_handler(CommandHandler("rankings", rankings))
     app.add_handler(CommandHandler("adminhelp", adminhelp))
 
     # Pagination
