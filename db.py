@@ -67,6 +67,15 @@ class Database:
             upsert=True,
         )
 
+    def log_code_request(self, telegram_id: int, username: str, email: str):
+        from datetime import datetime
+        self.db["code_requests"].insert_one({
+            "telegram_id": telegram_id,
+            "username": username,
+            "email": email,
+            "requested_at": datetime.utcnow()
+        })
+
     def list_users(self) -> list[dict]:
         return list(self.users.find({}, {"_id": 0}))
 
