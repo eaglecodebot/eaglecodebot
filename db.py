@@ -137,3 +137,18 @@ class Database:
         from datetime import datetime, timedelta
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         return self.users.count_documents({"last_seen": {"$gte": thirty_days_ago}})
+
+def get_user_email_requests(self, telegram_id: int) -> list[dict]:
+        pipeline = [
+            {"$match": {"telegram_id": telegram_id}},
+            {"$group": {
+                "_id": "$email",
+                "count": {"$sum": 1},
+                "last_requested": {"$max": "$requested_at"}
+            }},
+            {"$sort": {"count": -1}}
+        ]
+        return list(self.db["code_requests"].aggregate(pipeline))
+
+    def count_user_requests(self, telegram_id: int) -> int:
+        return self.db["code_requests"].count_documents({"telegram_id": telegram_id})
