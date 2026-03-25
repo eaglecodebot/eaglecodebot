@@ -30,10 +30,8 @@ class Database:
             if id_str.isdigit():
                 new_ids.append(int(id_str))
 
-        # Remove any admins not in the current ADMIN_IDS list
         self.admins.delete_many({"telegram_id": {"$nin": new_ids}})
 
-        # Add any new ones
         for tid in new_ids:
             self.admins.update_one(
                 {"telegram_id": tid},
@@ -66,15 +64,6 @@ class Database:
             },
             upsert=True,
         )
-
-    def log_code_request(self, telegram_id: int, username: str, email: str):
-        from datetime import datetime
-        self.db["code_requests"].insert_one({
-            "telegram_id": telegram_id,
-            "username": username,
-            "email": email,
-            "requested_at": datetime.utcnow()
-        })
 
     def list_users(self) -> list[dict]:
         return list(self.users.find({}, {"_id": 0}))
@@ -147,24 +136,33 @@ class Database:
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         return self.users.count_documents({"last_seen": {"$gte": thirty_days_ago}})
 
-def get_user_requests(self, telegram_id: int) -> list[dict]:
-        return list(
-            self.db["code_requests"]
-            .find({"telegram_id": telegram_id}, {"_id": 0})
-            .sort("requested_at", -1)
-        )
+    # ─────────────────────────────────────────────
+    # Code request logging
+    # ─────────────────────────────────────────────
 
-    def get_requests_paginated(self, page: int, page_size: int) -> list[dict]:
-        return list(
-            self.db["code_requests"]
-            .find({}, {"_id": 0})
-            .sort("requested_at", -1)
-            .skip(page * page_size)
-            .limit(page_size)
-        )
+    def log_code_request(self, telegram_id: int, username: str, email: str):
+        from datetime import datetime
+        self.db["code_requests"].insert_one({
+            "telegram_id": telegram_id,
+            "username": username,
+            "email": email,
+            "requested_at": datetime.utcnow()
+        })
 
-    def count_requests(self) -> int:
-        return self.db["code_requests"].count_documents({})
+    def get_user_email_requests(self, telegram_id: int) -> list[dict]:
+        pipeline = [
+            {"$match": {"telegram_id": telegram_id}},
+            {"$group": {
+                "_id": "$email",
+                "count": {"$sum": 1},
+                "last_requested": {"$max": "$requested_at"}
+            }},
+            {"$sort": {"count": -1}}
+        ]
+        return list(self.db["code_requests"].aggregate(pipeline))
+
+    def count_user_requests(self, telegram_id: int) -> int:
+        return self.db["code_requests"].count_documents({"telegram_id": telegram_id})
 
     def get_user_rankings(self) -> list[dict]:
         pipeline = [
